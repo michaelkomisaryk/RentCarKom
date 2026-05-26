@@ -73,7 +73,7 @@ async def main (page :ft .Page ):
                 show_message (page ,'Сторінку не знайдено.',error =True )
                 page .views .append (HomeView (page ).build ())
         except Exception as ex :
-            show_message (page ,f'Помилка: {ex !s }',error =True )
+            show_message (page ,f'Помилка- {ex !s }',error =True )
             page .views .append (HomeView (page ).build ())
         page .update ()
 
