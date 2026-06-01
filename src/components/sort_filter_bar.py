@@ -68,18 +68,15 @@ class SortFilterBar:
         self.sort_field: SortField = initial_sort
         self.sort_direction: SortDirection = initial_direction
         self._fuel_chips_row: ft.Row | None = None
-        self._sort_seg: ft.SegmentedButton | None = None
+        self._sort_chips_row: ft.Row | None = None
         self._dir_btn: ft.IconButton | None = None
-        self._active_sort_label: ft.Text | None = None
 
     def _notify(self):
         self._on_change()
 
     def _set_sort(self, field: SortField):
         self.sort_field = field
-        if self._sort_seg:
-            self._sort_seg.selected = [field]
-        self._update_sort_ui()
+        self._rebuild_sort_chips()
         self._notify()
 
     def _toggle_direction(self, _=None):
@@ -93,12 +90,26 @@ class SortFilterBar:
             self._dir_btn.icon = ft.Icons.ARROW_UPWARD if asc else ft.Icons.ARROW_DOWNWARD
             self._dir_btn.tooltip = "За зростанням" if asc else "За спаданням"
 
-    def _update_sort_ui(self):
-        if self._sort_seg:
-            self._sort_seg.selected = [self.sort_field]
-        if self._active_sort_label:
-            dir_txt = "↑" if self.sort_direction == "asc" else "↓"
-            self._active_sort_label.value = f"Активно: {SORT_LABELS[self.sort_field]} {dir_txt}"
+    def _rebuild_sort_chips(self):
+        if not self._sort_chips_row:
+            return
+        sort_icons = {
+            "price": ft.Icons.ATTACH_MONEY,
+            "popularity": ft.Icons.TRENDING_UP,
+            "newest": ft.Icons.NEW_RELEASES,
+            "rating": ft.Icons.STAR,
+            "availability": ft.Icons.CHECK_CIRCLE_OUTLINE,
+        }
+        self._sort_chips_row.controls = [
+            _chip(
+                SORT_LABELS[f],
+                active=self.sort_field == f,
+                icon=sort_icons.get(f),
+                on_click=lambda e, field=f: self._set_sort(field),
+            )
+            for f in _SORT_FIELDS
+        ]
+        self._page.update()
 
     def _set_fuel(self, fuel: str):
         self.fuel = fuel
@@ -126,40 +137,6 @@ class SortFilterBar:
         self._page.update()
 
     def build(self, *, brand_search_field: ft.TextField, avail_toggle: ft.Checkbox) -> ft.Container:
-        _sort_icons = {
-            "price": ft.Icons.ATTACH_MONEY,
-            "popularity": ft.Icons.TRENDING_UP,
-            "newest": ft.Icons.NEW_RELEASES,
-            "rating": ft.Icons.STAR,
-            "availability": ft.Icons.CHECK_CIRCLE_OUTLINE,
-        }
-        sort_segments = [
-            ft.Segment(
-                value=f,
-                label=ft.Text(SORT_LABELS[f], size=11),
-                icon=_sort_icons[f],
-            )
-            for f in _SORT_FIELDS
-        ]
-
-        def on_sort_seg(e: ft.ControlEvent):
-            sel = e.control.selected
-            if sel:
-                self.sort_field = sel[0]
-                self._update_sort_ui()
-                self._notify()
-
-        self._sort_seg = ft.SegmentedButton(
-            selected=[self.sort_field],
-            segments=sort_segments,
-            allow_multiple_selection=False,
-            style=ft.ButtonStyle(
-                bgcolor=ft.Colors.with_opacity(0.08, ft.Colors.DEEP_PURPLE),
-                color=ft.Colors.BLUE_GREY_800,
-                overlay_color=ft.Colors.with_opacity(0.12, ft.Colors.DEEP_PURPLE),
-            ),
-            on_change=on_sort_seg,
-        )
         self._dir_btn = ft.IconButton(
             icon=ft.Icons.ARROW_UPWARD,
             icon_color=ft.Colors.DEEP_PURPLE_700,
@@ -172,31 +149,14 @@ class SortFilterBar:
         )
         self._update_dir_btn()
 
-        self._active_sort_label = ft.Text(
-            f"Активно: {SORT_LABELS[self.sort_field]} {('↑' if self.sort_direction == 'asc' else '↓')}",
-            size=12,
-            color=ft.Colors.DEEP_PURPLE_700,
-            weight=ft.FontWeight.W_600,
-        )
-
         def on_avail(e: ft.ControlEvent):
             self._set_available(bool(e.control.value))
 
         avail_toggle.on_change = on_avail
         self._fuel_chips_row = ft.Row(spacing=8, wrap=True, run_spacing=8)
         self._rebuild_fuel_chips()
-
-        sort_row = ft.Row(
-            controls=[
-                ft.Container(
-                    content=self._sort_seg,
-                    expand=True,
-                ),
-                self._dir_btn,
-            ],
-            spacing=8,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
+        self._sort_chips_row = ft.Row(spacing=8, wrap=True, run_spacing=8)
+        self._rebuild_sort_chips()
 
         filter_panel = ft.Container(
             content=ft.Column(
@@ -210,8 +170,6 @@ class SortFilterBar:
                                 weight=ft.FontWeight.W_700,
                                 color=ft.Colors.BLUE_GREY_900,
                             ),
-                            ft.Container(expand=True),
-                            self._active_sort_label,
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -220,8 +178,20 @@ class SortFilterBar:
                     self._fuel_chips_row,
                     ft.Row(controls=[avail_toggle]),
                     ft.Divider(height=1, color=ft.Colors.BLUE_GREY_100),
-                    ft.Text("Сортування", size=12, color=ft.Colors.BLUE_GREY_600, weight=ft.FontWeight.W_500),
-                    sort_row,
+                    ft.Row(
+                        controls=[
+                            ft.Text(
+                                "Сортування",
+                                size=12,
+                                color=ft.Colors.BLUE_GREY_600,
+                                weight=ft.FontWeight.W_500,
+                            ),
+                            ft.Container(expand=True),
+                            self._dir_btn,
+                        ],
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    self._sort_chips_row,
                 ],
                 spacing=12,
             ),
